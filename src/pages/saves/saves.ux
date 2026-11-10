@@ -1,0 +1,124 @@
+<template>
+  <div class="page">
+    <text class="title">{{mode === 'save' ? '保存' : '读档'}}</text>
+    <text class="sub">{{mode === 'save' ? '选一个栏位写入' : '轻触栏位读取'}}</text>
+
+    <div class="slot" for="{{items}}" style="top: {{$item.top}}px;" onclick="onTap($idx)">
+      <div class="bar"></div>
+      <text class="no">{{$item.no}}</text>
+      <text class="cap">{{$item.cap}}</text>
+      <text class="meta">{{$item.meta}}</text>
+    </div>
+
+    <div class="pager">
+      <text class="pg" onclick="prev">‹</text>
+      <text class="pnum">{{page + 1}} / {{pages}}</text>
+      <text class="pg" onclick="next">›</text>
+    </div>
+
+    <div class="backbtn" onclick="back">
+      <text class="back-t">返回</text>
+    </div>
+  </div>
+</template>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #141512; flex-direction: column; }
+.title { margin-left: 18px; margin-top: 12px; font-size: 22px; color: #eeeadd; }
+.sub { margin-left: 18px; margin-top: 2px; font-size: 11px; color: #a4a48e; }
+
+.slot { position: absolute; left: 14px; width: 308px; height: 84px; background-color: #282921; }
+.bar { position: absolute; left: 0; top: 0; width: 3px; height: 84px; background-color: #a17c3b; }
+.no { position: absolute; left: 12px; top: 28px; width: 34px; font-size: 20px; color: #c49342; }
+.cap { position: absolute; left: 52px; top: 20px; width: 240px; font-size: 14px; color: #eeeadd; }
+.meta { position: absolute; left: 52px; top: 46px; width: 240px; font-size: 10px; color: #b8ac8b; }
+
+.pager { position: absolute; left: 0; top: 384px; width: 336px; height: 26px; flex-direction: row; justify-content: center; align-items: center; }
+.pg { width: 56px; text-align: center; font-size: 20px; color: #d1cbb6; }
+.pnum { width: 90px; text-align: center; font-size: 12px; color: #b8ac8b; }
+.backbtn { position: absolute; left: 98px; top: 424px; width: 140px; height: 40px; background-color: #2c2e26; border-width: 1px; border-style: solid; border-color: #eb6877; border-radius: 12px; justify-content: center; align-items: center; }
+.back-t { font-size: 18px; color: #f7dfce; }
+</style>
+
+<script>
+import router from '@system.router'
+import prompt from '@system.prompt'
+import storage from '@system.storage'
+import { loadSaves, saveSaves } from '../../common/reader.js'
+
+const PER = 3
+const TOPS = [62, 154, 246]
+
+export default {
+  protected: {
+    mode: 'load',
+    items: [],
+    page: 0,
+    pages: 1
+  },
+
+  onInit() {
+    this.lockTap = 0
+    this.all = []
+    this.pending = null
+    loadSaves((list) => { this.all = list; this.loadPending() })
+  },
+
+  loadPending() {
+    storage.get({
+      key: 'pendingSave',
+      default: '',
+      success: (v) => {
+        if (v) {
+          try { this.pending = JSON.parse(v) } catch (e) { this.pending = null }
+          storage.delete({ key: 'pendingSave' })
+        }
+        this.refresh()
+      },
+      fail: () => this.refresh()
+    })
+  },
+
+  refresh() {
+    this.pages = Math.max(1, Math.ceil(this.all.length / PER))
+    if (this.page >= this.pages) this.page = this.pages - 1
+    const out = []
+    const base = this.page * PER
+    for (let i = 0; i < PER; i++) {
+      const idx = base + i
+      if (idx >= this.all.length) break
+      const s = this.all[idx]
+      out.push({
+        no: idx + 1 < 10 ? '0' + (idx + 1) : '' + (idx + 1),
+        cap: s ? (s.chapter || '进度') : '空栏位',
+        meta: s ? (s.text || '已记录') : '——',
+        top: TOPS[i]
+      })
+    }
+    this.items = out
+  },
+
+  prev() { if (this.page > 0) { this.page--; this.refresh() } },
+  next() { if (this.page < this.pages - 1) { this.page++; this.refresh() } },
+
+  onTap(i) {
+    if (this.lockTap && Date.now() - this.lockTap < 400) return
+    this.lockTap = Date.now()
+    const idx = this.page * PER + i
+    if (this.mode === 'save') {
+      if (!this.pending) { prompt.showToast({ message: '没有可写入的进度', duration: 1500 }); return }
+      this.all[idx] = this.pending
+      saveSaves(this.all, () => {
+        prompt.showToast({ message: '已保存到 ' + (idx + 1) + ' 号', duration: 1200 })
+        router.back()
+      })
+      return
+    }
+    const s = this.all[idx]
+    if (!s) { prompt.showToast({ message: '这个栏位还没有存档', duration: 1500 }); return }
+    router.replace({ uri: 'pages/game', params: { at: String(s.pc || 0) } })
+  },
+
+  back() { router.back() }
+}
+</script>

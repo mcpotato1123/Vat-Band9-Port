@@ -1,0 +1,123 @@
+<template>
+  <div class="page">
+    <text class="title" onclick="tapTitle">关于</text>
+    <text class="ver">V {{ver}}</text>
+
+    <text class="line" for="{{pageLines}}" style="top: {{$item.top}}px; color: {{$item.c}}; font-size: {{$item.s}}px;">{{$item.t}}</text>
+
+    <div class="pager">
+      <text class="pg" onclick="prev">‹</text>
+      <text class="pnum">{{page + 1}} / {{pages}}</text>
+      <text class="pg" onclick="next">›</text>
+    </div>
+
+    <div class="backbtn" onclick="back">
+      <text class="back-t">返回</text>
+    </div>
+  </div>
+</template>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #141512; flex-direction: column; }
+.title { margin-left: 18px; margin-top: 10px; font-size: 22px; color: #eeeadd; }
+.ver { position: absolute; left: 250px; top: 18px; width: 70px; text-align: right; font-size: 10px; color: #777663; }
+.line { position: absolute; left: 18px; width: 300px; lines: 1; }
+.pager { position: absolute; left: 0; top: 384px; width: 336px; height: 26px; flex-direction: row; justify-content: center; align-items: center; }
+.pg { width: 56px; text-align: center; font-size: 20px; color: #d1cbb6; }
+.pnum { width: 90px; text-align: center; font-size: 12px; color: #b8ac8b; }
+.backbtn { position: absolute; left: 98px; top: 424px; width: 140px; height: 40px; background-color: #2c2e26; border-width: 1px; border-style: solid; border-color: #eb6877; border-radius: 12px; justify-content: center; align-items: center; }
+.back-t { font-size: 18px; color: #f7dfce; }
+</style>
+
+<script>
+import router from '@system.router'
+import storage from '@system.storage'
+import { IMG } from '../../common/assets.js'
+
+const CPL = 21
+const PER = 14
+const TOPS = [52, 76, 100, 124, 148, 172, 196, 220, 244, 268, 292, 316, 340, 364]
+
+const SRC = [
+  ['h', '故事'],
+  ['p', '银河市建设与交通部发布通告：因曲境高速公路工程，太阳系将被拆除。'],
+  ['p', '通告发布后的第三分钟，四十二星际建设公司高级工程师基伯·卡当抵达地球，执行生命切片计划。'],
+  ['p', '抽签选中的人，是少女陈蝶蕊，和她的同桌许清北。'],
+  ['g', ''],
+  ['h', '操作'],
+  ['p', '轻触画面：文字未完则立即显示完整；本页已完则翻页或进入下一句。'],
+  ['p', '右滑或点右上角 ≡：打开阅读菜单。'],
+  ['g', ''],
+  ['h', '移植说明'],
+  ['p', '本作为 Ren\'Py 原作的非官方手环移植版，美术按 336×268 重新转码，剧本按分块流式读取。'],
+  ['p', '界面参考 xuanyide01 的《命运石之门》REDMI Watch 5 版；工程结构参考 mcpotato1123 的 GalGod 手环版。'],
+  ['g', ''],
+  ['h', '版权'],
+  ['p', '剧本与美术资源版权归原作者所有。本项目仅供学习交流，请勿用于商业用途。']
+]
+
+export default {
+  protected: {
+    ver: '1.0.0',
+    lines: [],
+    pageLines: [],
+    page: 0,
+    pages: 1
+  },
+
+  onInit() {
+    this.taps = 0
+    this.lastTap = 0
+    this.build()
+  },
+
+  tapTitle() {
+    const now = Date.now()
+    if (now - this.lastTap > 2000) this.taps = 0
+    this.lastTap = now
+    this.taps++
+    if (this.taps >= 7) { this.taps = 0; this.unlockAll() }
+  },
+
+  unlockAll() {
+    const seen = []
+    for (let i = 0; i < IMG.length; i++) if (IMG[i].k === 'cg') seen.push(i)
+    storage.set({ key: 'cgSeen', value: JSON.stringify(seen) })
+  },
+
+  build() {
+    const out = []
+    for (let i = 0; i < SRC.length; i++) {
+      const kind = SRC[i][0]
+      const text = SRC[i][1]
+      if (kind === 'g') { out.push({ t: ' ', c: '#141512', s: 8 }); continue }
+      if (kind === 'h') { out.push({ t: text, c: '#eb6877', s: 16 }); continue }
+      let line = ''
+      for (let c = 0; c < text.length; c++) {
+        line += text.charAt(c)
+        if (line.length >= CPL) { out.push({ t: line, c: '#d1cbb6', s: 13 }); line = '' }
+      }
+      if (line) out.push({ t: line, c: '#d1cbb6', s: 13 })
+    }
+    this.lines = out
+    this.pages = Math.max(1, Math.ceil(out.length / PER))
+    this.refresh()
+  },
+
+  refresh() {
+    const out = []
+    const base = this.page * PER
+    for (let i = 0; i < PER; i++) {
+      const l = this.lines[base + i]
+      if (!l) break
+      out.push({ t: l.t, c: l.c, s: l.s, top: TOPS[i] })
+    }
+    this.pageLines = out
+  },
+
+  prev() { if (this.page > 0) { this.page--; this.refresh() } },
+  next() { if (this.page < this.pages - 1) { this.page++; this.refresh() } },
+
+  back() { router.back() }
+}
+</script>

@@ -1,0 +1,606 @@
+<template>
+  <div class="page" onswipe="onSwipe">
+
+    <!-- ===== scene ===== -->
+    <div class="art">
+      <image class="bg" src="{{bgSrc}}" if="{{bgSrc}}"></image>
+      <image class="sp sp0" src="{{sp0}}" if="{{sp0}}"></image>
+      <image class="sp sp1" src="{{sp1}}" if="{{sp1}}"></image>
+      <image class="sp sp2" src="{{sp2}}" if="{{sp2}}"></image>
+
+      <div class="hud-bg"></div>
+      <div class="hud">
+        <text class="chapter">{{chapter}}</text>
+        <text class="counter">{{counter}}</text>
+      </div>
+      <div class="bar-bg"></div>
+      <div class="bar-fg" style="width: {{progress}}px;"></div>
+
+      <div class="tap" onclick="onTap"></div>
+
+      <text class="more" if="{{!endText}}" onclick="openMenu">≡</text>
+      <text class="next" if="{{canTap && !choices.length && !endText}}">▼</text>
+      <text class="hint" if="{{badge}}">{{badge}}</text>
+    </div>
+
+    <!-- ===== dialogue ===== -->
+    <div class="panel">
+      <div class="speaker-row">
+        <text class="speaker">{{speaker}}</text>
+        <text class="site">{{site}}</text>
+      </div>
+      <text class="ln" style="{{s0}}" if="{{!endText}}">{{l0}}</text>
+      <text class="ln" style="{{s1}}" if="{{!endText}}">{{l1}}</text>
+      <text class="ln" style="{{s2}}" if="{{!endText}}">{{l2}}</text>
+      <text class="ln" style="{{s3}}" if="{{!endText}}">{{l3}}</text>
+      <text class="ln" style="{{s4}}" if="{{!endText}}">{{l4}}</text>
+      <text class="ln" style="{{s5}}" if="{{!endText}}">{{l5}}</text>
+      <text class="end" if="{{endText}}">{{endText}}</text>
+    </div>
+
+    <!-- ===== choices ===== -->
+    <div class="choice-mask" if="{{choices.length}}">
+      <text class="choice-p" if="{{prompt}}">{{prompt}}</text>
+      <div class="choice" for="{{choices}}" onclick="pickIdx($idx)">
+        <text class="choice-t">{{$item.x}}</text>
+      </div>
+    </div>
+
+    <!-- ===== quit confirm ===== -->
+    <div class="confirm" if="{{confirming}}">
+      <text class="c-msg">是否要退出游戏？</text>
+      <div class="c-row">
+        <image class="c-btn" src="/common/ui/confirm.png" onclick="doExit"></image>
+        <image class="c-btn" src="/common/ui/cancel.png" onclick="cancelExit"></image>
+      </div>
+    </div>
+
+    <!-- ===== menu ===== -->
+    <div class="mask" if="{{menuOpen}}" onclick="closeMenu">
+      <div class="sheet" onclick="noop">
+        <text class="sheet-title">READING</text>
+        <div class="sheet-row" for="{{menuRows}}" style="top: {{$item.top}}px;" onclick="onMenuIdx($idx)">
+          <text class="sheet-t">{{$item.t}}</text>
+          <text class="sheet-v">{{$item.v}}</text>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #141512; flex-direction: column; }
+.art { position: relative; width: 336px; height: 252px; background-color: #000000; overflow: hidden; }
+.bg { position: absolute; left: 0; top: 32px; width: 336px; height: 220px; }
+.sp { position: absolute; top: 32px; width: 143px; height: 220px; }
+.sp0 { left: 2px; }
+.sp1 { left: 96px; }
+.sp2 { left: 190px; }
+
+.hud-bg { position: absolute; left: 0; top: 0; width: 336px; height: 32px; background-color: #0a0b09; }
+.hud { position: absolute; left: 10px; top: 8px; width: 250px; height: 20px; flex-direction: row; }
+.chapter { font-size: 14px; color: #f7dfce; }
+.counter { margin-left: 8px; font-size: 12px; color: #c9b3ac; }
+.bar-bg { position: absolute; left: 0; top: 0; width: 336px; height: 2px; background-color: rgba(255,255,255,0.10); }
+.bar-fg { position: absolute; left: 0; top: 0; height: 2px; background-color: #efa63c; }
+.tap { position: absolute; left: 0; top: 0; width: 336px; height: 252px; }
+.more { position: absolute; right: 0px; top: 0px; width: 46px; height: 32px; text-align: center; font-size: 30px; color: #f0eee4; }
+.next { position: absolute; right: 8px; bottom: 4px; width: 18px; text-align: center; font-size: 12px; color: #efa63c; }
+.hint { position: absolute; left: 10px; bottom: 6px; font-size: 8px; color: #98aabd; }
+
+.panel { position: relative; width: 336px; height: 228px; background-color: rgba(20,21,18,0.94); }
+.speaker-row { position: absolute; left: 10px; top: 6px; width: 316px; height: 24px; flex-direction: row; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #5a5949; align-items: center; }
+.speaker { font-size: 15px; color: #efaa42; }
+.site { margin-left: 8px; font-size: 9px; color: #a4a48e; }
+.ln { position: absolute; left: 10px; width: 316px; color: #f0eee4; lines: 1; }
+.end { position: absolute; left: 10px; top: 80px; width: 316px; font-size: 15px; color: #d1cbb6; text-align: center; }
+
+.choice-mask { position: absolute; left: 0; top: 0; width: 336px; height: 480px; background-color: rgba(10,11,9,0.86); flex-direction: column; justify-content: flex-end; }
+.choice-p { position: absolute; left: 16px; top: 40px; width: 304px; font-size: 12px; color: #c3ac78; }
+.choice { margin-left: 12px; margin-bottom: 8px; width: 312px; min-height: 44px; background-color: #303127; border-left-width: 3px; border-left-style: solid; border-left-color: #e49a2c; justify-content: center; padding-left: 10px; padding-right: 8px; }
+.choice-t { font-size: 14px; color: #ffffff; }
+
+.mask { position: absolute; left: 0; top: 0; width: 336px; height: 480px; background-color: rgba(10,11,9,0.90); justify-content: center; align-items: center; }
+.confirm { position: absolute; left: 0; top: 0; width: 336px; height: 480px; background-color: rgba(8,6,8,0.86); flex-direction: column; justify-content: flex-start; align-items: center; }
+.c-msg { margin-top: 132px; width: 300px; text-align: center; font-size: 22px; color: #f7dfce; }
+.c-row { margin-top: 52px; width: 260px; flex-direction: row; justify-content: center; align-items: center; }
+.c-btn { width: 56px; height: 56px; margin-left: 34px; margin-right: 34px; }
+.sheet { position: relative; width: 300px; height: 312px; background-color: #141512; border-width: 1px; border-style: solid; border-color: #424337; flex-direction: column; }
+.sheet-title { position: absolute; left: 14px; top: 8px; font-size: 12px; color: #eb6877; letter-spacing: 2px; }
+.sheet-row { position: absolute; left: 0; width: 300px; height: 38px; border-bottom-width: 1px; border-bottom-style: solid; border-bottom-color: #292b23; }
+.sheet-t { position: absolute; left: 16px; top: 9px; font-size: 16px; color: #e3e1cf; }
+.sheet-v { position: absolute; left: 196px; top: 11px; width: 90px; text-align: right; font-size: 12px; color: #b8ac8b; }
+</style>
+
+<script>
+import router from '@system.router'
+import file from '@system.file'
+import prompt from '@system.prompt'
+import storage from '@system.storage'
+import brightness from '@system.brightness'
+import { IMG } from '../../common/assets.js'
+import { PANEL_TOP, TEXT_TOP, TEXT_W, TEXT_PAD, TEXT_H, MAX_LINES } from '../../common/theme.js'
+import { loadSettings, saveSettings, paginateText, autoDelay, readJSON, writeJSON } from '../../common/reader.js'
+
+const SAVE_MAGIC = 'vat-band-1'
+
+export default {
+  protected: {
+    // route params
+    at: '',
+    fresh: '',
+    // view model
+    bgSrc: '',
+    sp0: '', sp1: '', sp2: '',
+    speaker: '', site: '',
+    chapter: '', counter: '', progress: 0,
+    l0: '', l1: '', l2: '', l3: '', l4: '', l5: '',
+    s0: '', s1: '', s2: '', s3: '', s4: '', s5: '',
+    canTap: false, menuOpen: false, confirming: false,
+    endText: '', badge: '',
+    choices: [], prompt: '',
+    menuRows: []
+  },
+
+  onInit() {
+    this.pc = 0
+    this.story = null
+    this.nodes = null
+    this.chunkAt = -1
+    this.chunkCache = {}
+    this.pageText = ''
+    this.pages = [['']]
+    this.pageIdx = 0
+    this.typing = 0
+    this.typingToken = 0
+    this.timer = null
+    this.autoTimer = null
+    this.cgSeen = []
+    this.settings = null
+    this.stepCount = 0
+    this.lockTap = 0
+    this.menuRows = this.buildMenu()
+
+    const start = parseInt(String(this.at || '0'), 10)
+    this.pc = isNaN(start) ? 0 : start
+
+    loadSettings((s) => {
+      this.settings = s
+      this.applyScreenKeepOn(true)
+      this.loadSeen(() => this.bootstrap())
+    })
+  },
+
+  buildMenu() {
+    const rows = [
+      { id: 'save', t: '保存进度', v: '' },
+      { id: 'load', t: '读取进度', v: '' },
+      { id: 'auto', t: '自动播放', v: '' },
+      { id: 'fast', t: '快进', v: '' },
+      { id: 'setting', t: '设置', v: '' },
+      { id: 'home', t: '回到标题', v: '' },
+      { id: 'exit', t: '退出应用', v: '' }
+    ]
+    for (let i = 0; i < rows.length; i++) rows[i].top = 32 + i * 38
+    return rows
+  },
+
+  // ---------- bootstrap ----------
+  bootstrap() {
+    file.readText({
+      uri: '/common/story/index.txt',
+      success: (d) => {
+        try {
+          this.story = JSON.parse(d.text)
+        } catch (e) {
+          this.badge = 'index parse fail'
+          return
+        }
+        if (!this.story || !this.story.chunks) { this.badge = 'index empty'; return }
+        this.goto(this.pc)
+      },
+      fail: (d, code) => { this.badge = 'index fail ' + code }
+    })
+  },
+
+  readChunk(idx, cb) {
+    if (!this.chunkCache) this.chunkCache = {}
+    if (this.chunkCache[idx]) return cb(this.chunkCache[idx])
+    const ch = this.story.chunks[idx]
+    file.readText({
+      uri: '/common/story/' + ch.f,
+      success: (d) => {
+        let arr = null
+        try { arr = JSON.parse(d.text) } catch (e) { arr = null }
+        if (!arr || arr.length !== ch.n) { cb(null); return }
+        this.chunkCache[idx] = arr
+        cb(arr)
+      },
+      fail: () => cb(null)
+    })
+  },
+
+  nodeAt(pc) {
+    const list = this.story.chunks
+    for (let i = 0; i < list.length; i++) {
+      if (pc >= list[i].start && pc < list[i].start + list[i].n) return { block: i, off: pc - list[i].start }
+    }
+    return null
+  },
+
+  // ---------- story engine ----------
+  goto(pc) {
+    const total = this.story.total
+    if (pc === undefined || pc === null || pc < 0) pc = 0
+    if (pc >= total) { this.showEnd(); return }
+    this.pc = pc
+    const loc = this.nodeAt(pc)
+    if (!loc) { this.showEnd(); return }
+
+    const run = (nodes) => {
+      if (!nodes) { this.badge = 'chunk fail'; return }
+      this.nodes = nodes
+      const node = nodes[loc.off]
+      if (!node) { this.showEnd(); return }
+      if (node.t === 'j') { this.goto(node.j); return }
+      if (node.t === 'e') { this.showEnd(); return }
+      if (node.t === 'o') { this.showChoice(node); return }
+      this.showLine(node)
+    }
+
+    if (this.nodes && this.chunkAt === loc.block) run(this.nodes)
+    else {
+      this.chunkAt = loc.block
+      this.readChunk(loc.block, (nodes) => { run(nodes) })
+    }
+  },
+
+  imgSrc(idx) {
+    if (idx === undefined || idx === null || idx < 0) return ''
+    const e = IMG[idx]
+    return e ? e.p : ''
+  },
+
+  showLine(node) {
+    this.endText = ''
+    this.choices = []
+    this.prompt = ''
+    this.bgSrc = node.bg > 0 || node.bg === 0 ? this.imgSrc(node.bg) : ''
+    const sp = node.sp || []
+    this.sp0 = sp[0] ? this.imgSrc(sp[0][1]) : ''
+    this.sp1 = sp[1] ? this.imgSrc(sp[1][1]) : ''
+    this.sp2 = sp[2] ? this.imgSrc(sp[2][1]) : ''
+    this.speaker = node.n || ''
+    this.site = node.n ? '' : '旁白'
+    this.updateChapter()
+    if (node.cg !== undefined) this.markSeen(node.cg)
+    this.startText(node.x)
+  },
+
+  updateChapter() {
+    const chs = this.story.chapters || []
+    let cur = chs[0] || { title: '', start: 0 }
+    let next = this.story.total
+    for (let i = 0; i < chs.length; i++) {
+      if (this.pc >= chs[i].start) {
+        cur = chs[i]
+        next = chs[i + 1] ? chs[i + 1].start : this.story.total
+      }
+    }
+    const span = Math.max(1, next - cur.start)
+    const done = Math.max(0, Math.min(1, (this.pc - cur.start) / span))
+    this.chapter = cur.title || ''
+    this.counter = Math.round(done * 100) + '%'
+    this.progress = Math.round(done * 336)
+  },
+
+  // ---------- text ----------
+  layout() {
+    const size = (this.settings && this.settings.size) || 18
+    const lineH = size + 4
+    const cpl = Math.max(4, Math.floor((TEXT_W - TEXT_PAD) / size))
+    const lpp = Math.max(1, Math.min(MAX_LINES, Math.floor(TEXT_H / lineH)))
+    return { size: size, lineH: lineH, cpl: cpl, lpp: lpp }
+  },
+
+  applyLayout() {
+    const L = this.layout()
+    for (let i = 0; i < MAX_LINES; i++) {
+      const st = 'top: ' + (TEXT_TOP - PANEL_TOP + 10 + i * L.lineH) + 'px; font-size: ' + L.size +
+        'px; line-height: ' + L.lineH + 'px;'
+      if (i === 0) this.s0 = st
+      if (i === 1) this.s1 = st
+      if (i === 2) this.s2 = st
+      if (i === 3) this.s3 = st
+      if (i === 4) this.s4 = st
+      if (i === 5) this.s5 = st
+    }
+    return L
+  },
+
+  startText(text) {
+    this.clearTimers()
+    const L = this.applyLayout()
+    this.pages = paginateText(text || '', L.cpl, L.lpp)
+    this.pageIdx = 0
+    this.playPage()
+    this.bumpAutoSave()
+  },
+
+  playPage() {
+    this.clearAuto()
+    this.pageText = (this.pages[this.pageIdx] || ['']).join('\n')
+    this.typing = 0
+    this.renderTyping(0)
+    const speed = this.settings.fast ? 0 : this.settings.speed
+    if (!speed) { this.finishTyping(); return }
+    this.typingToken++
+    this.typingAt = Date.now()
+    this.tickTyping(this.typingToken)
+  },
+
+  tickTyping(token) {
+    if (token !== this.typingToken) return
+    const speed = this.settings.fast ? 0 : this.settings.speed
+    if (!speed) { this.finishTyping(); return }
+    const full = this.pageText.length
+    const elapsed = Math.max(0, Date.now() - this.typingAt)
+    const n = Math.max(this.typing + 1, Math.floor(elapsed / speed) + 1)
+    if (n >= full) { this.typing = full; this.renderTyping(full); this.finishTyping(); return }
+    this.typing = n
+    this.renderTyping(n)
+    this.timer = setTimeout(() => this.tickTyping(token), 50)
+  },
+
+  renderTyping(n) {
+    const full = this.pageText || ''
+    const shown = n >= full.length ? full : full.slice(0, n)
+    const seg = shown.split('\n')
+    this.l0 = seg[0] || ''
+    this.l1 = seg[1] || ''
+    this.l2 = seg[2] || ''
+    this.l3 = seg[3] || ''
+    this.l4 = seg[4] || ''
+    this.l5 = seg[5] || ''
+    this.canTap = n >= full.length
+  },
+
+  finishTyping() {
+    this.typingToken++
+    if (this.timer) { clearTimeout(this.timer); this.timer = null }
+    this.typing = (this.pageText || '').length
+    this.renderTyping(this.typing)
+    this.scheduleAuto()
+  },
+
+  scheduleAuto() {
+    this.clearAuto()
+    if (!this.settings) return
+    if (this.choices.length || this.endText) return
+    if (this.settings.fast) { this.autoTimer = setTimeout(() => this.advance(), 220); return }
+    if (this.settings.autoMs > 0) {
+      const d = autoDelay(this.pageText, this.settings.autoMs)
+      this.autoTimer = setTimeout(() => this.advance(), d)
+    }
+  },
+
+  clearAuto() {
+    if (this.autoTimer) { clearTimeout(this.autoTimer); this.autoTimer = null }
+  },
+
+  clearTimers() {
+    this.clearAuto()
+    if (this.timer) { clearTimeout(this.timer); this.timer = null }
+    this.typingToken++
+  },
+
+  // ---------- interaction ----------
+  lock() { this.lockTap = Date.now() },
+
+  onTap() {
+    if (this.lockTap && Date.now() - this.lockTap < 400) return
+    this.advance()
+  },
+
+  advance() {
+    if (this.endText) { router.replace({ uri: 'pages/index' }); return }
+    if (this.menuOpen) return
+    if (this.choices.length) return
+    this.clearAuto()
+    if (!this.canTap) { this.finishTyping(); return }
+    if (this.pageIdx < this.pages.length - 1) { this.pageIdx++; this.playPage(); return }
+    this.pc++
+    this.stepCount++
+    this.goto(this.pc)
+  },
+
+  onSwipe(e) {
+    let dir = e && e.direction
+    if (!dir && e && e.detail) dir = e.detail.direction
+    if (dir === 'right') this.openMenu()
+  },
+
+  openMenu() {
+    this.lock()
+    this.refreshMenu()
+    this.menuOpen = true
+    this.clearAuto()
+  },
+
+  closeMenu() {
+    this.lock()
+    this.menuOpen = false
+    this.scheduleAuto()
+  },
+
+  noop() {},
+
+  refreshMenu() {
+    const rows = this.buildMenu()
+    rows[2].v = this.settings.autoMs > 0 ? this.settings.autoMs + 'ms' : '关'
+    rows[3].v = this.settings.fast ? '开' : '关'
+    this.menuRows = rows
+  },
+
+  onMenu(id) {
+    if (id === 'save') return this.doSave()
+    if (id === 'load') { this.menuOpen = false; router.push({ uri: 'pages/saves', params: { mode: 'load' } }); return }
+    if (id === 'auto') {
+      this.settings.autoMs = this.settings.autoMs > 0 ? 0 : 60
+      this.settings.fast = false
+      saveSettings(this.settings)
+      this.refreshMenu()
+      this.scheduleAuto()
+      return
+    }
+    if (id === 'fast') {
+      this.settings.fast = !this.settings.fast
+      this.settings.autoMs = 0
+      this.refreshMenu()
+      this.scheduleAuto()
+      return
+    }
+    if (id === 'setting') { this.menuOpen = false; router.push({ uri: 'pages/settings' }); return }
+    if (id === 'home') { this.menuOpen = false; this.forceSave(); router.replace({ uri: 'pages/index' }); return }
+    if (id === 'exit') { this.menuOpen = false; this.confirming = true; return }
+  },
+
+  doExit() {
+    this.forceSave()
+    this.$app.exit()
+  },
+
+  cancelExit() {
+    this.lock()
+    this.confirming = false
+  },
+
+  // ---------- choices ----------
+  showChoice(node) {
+    this.clearTimers()
+    this.choices = (node.o || []).map((o) => ({ x: o.x, j: o.j }))
+    this.prompt = node.p || ''
+    this.canTap = false
+  },
+
+  pick(j) {
+    this.lock()
+    this.choices = []
+    this.prompt = ''
+    this.goto(j)
+  },
+
+  pickIdx(i) {
+    const c = this.choices[i]
+    if (c) this.pick(c.j)
+  },
+
+  onMenuIdx(i) {
+    const row = this.menuRows[i]
+    if (row) this.onMenu(row.id)
+  },
+
+  // ---------- end ----------
+  showEnd() {
+    this.clearTimers()
+    this.endText = '—— 本章完 ——\n轻触返回标题'
+    this.choices = []
+    this.canTap = true
+    saveSettings(this.settings)
+  },
+
+  // ---------- save ----------
+  collectSave() {
+    return {
+      magic: SAVE_MAGIC,
+      pc: this.pc,
+      chapter: this.chapter,
+      text: (this.pages[this.pageIdx] || ['']).join(' / ').slice(0, 24),
+      at: Date.now()
+    }
+  },
+
+  doSave() {
+    const data = this.collectSave()
+    this.menuOpen = false
+    storage.set({
+      key: 'pendingSave',
+      value: JSON.stringify(data),
+      success: () => router.push({ uri: 'pages/saves', params: { mode: 'save' } }),
+      fail: () => prompt.showToast({ message: '存档准备失败', duration: 1500 })
+    })
+  },
+
+  forceSave() {
+    const data = this.collectSave()
+    storage.set({ key: 'autoSave', value: JSON.stringify(data) })
+  },
+
+  bumpAutoSave() {
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.saveTimer = setTimeout(() => {
+      storage.set({ key: 'autoSave', value: JSON.stringify(this.collectSave()) })
+    }, 400)
+  },
+
+  // ---------- cg ----------
+  loadSeen(done) {
+    readJSON('cgSeen', [], (l) => { this.cgSeen = l || []; done() })
+  },
+
+  markSeen(idx) {
+    if (this.cgSeen.indexOf(idx) >= 0) return
+    this.cgSeen.push(idx)
+    writeJSON('cgSeen', this.cgSeen)
+  },
+
+  // ---------- system ----------
+  applyScreenKeepOn(on) {
+    if (!this.settings) return
+    try {
+      brightness.setKeepScreenOn({ keepScreenOn: !!on && this.settings.keepOn !== false })
+    } catch (e) {}
+  },
+
+  // ---------- lifecycle ----------
+  onShow() {
+    loadSettings((s) => {
+      const changed = !this.settings || s.size !== this.settings.size
+      this.settings = s
+      this.applyScreenKeepOn(true)
+      if (changed && this.pageText) {
+        const L = this.applyLayout()
+        this.pages = paginateText(this.pageText, L.cpl, L.lpp)
+        this.pageIdx = 0
+        this.playPage()
+      }
+    })
+    if (this.typing || this.pageText) {
+      this.typingToken++
+      this.renderTyping((this.pageText || '').length)
+    }
+  },
+
+  onHide() {
+    this.clearTimers()
+    this.applyScreenKeepOn(false)
+    this.forceSave()
+  },
+
+  onDestroy() {
+    this.clearTimers()
+    this.applyScreenKeepOn(false)
+    this.forceSave()
+    this.story = null
+    this.nodes = null
+    this.chunkCache = null
+  },
+
+  onBackPress() {
+    if (this.menuOpen) { this.closeMenu(); return true }
+    if (this.choices.length) return true
+    this.openMenu()
+    return true
+  }
+}
+</script>

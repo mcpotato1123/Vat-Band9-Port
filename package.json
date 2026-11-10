@@ -1,0 +1,20 @@
+{
+  "name": "vat-band9pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "《拆迁地球及爱情事故》小米手环 9 Pro 移植版（Vela 快应用）",
+  "scripts": {
+    "build": "node tools/build.js",
+    "release": "node tools/build.js release",
+    "start": "aiot start",
+    "check": "node tools/check.js",
+    "preview": "python tools/preview_ui.py"
+  },
+  "devDependencies": {
+    "aiot-toolkit": "2.0.5",
+    "@aiot-toolkit/jsc": "^1.0.9"
+  },
+  "browserslist": [
+    "chrome 65"
+  ]
+}

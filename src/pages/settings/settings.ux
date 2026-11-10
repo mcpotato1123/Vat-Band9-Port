@@ -1,0 +1,123 @@
+<template>
+  <div class="page">
+    <text class="title">设置</text>
+    <text class="sub">轻触 − / + 调节 · 立即生效</text>
+
+    <scroll class="sc" scroll-y="true">
+      <div class="inner">
+        <div class="row" for="{{rows}}" style="top: {{$item.top}}px;">
+          <text class="lab">{{$item.label}}</text>
+          <text class="minus" if="{{$item.ctl}}" onclick="stepAt($idx, 0)">−</text>
+          <text class="val" if="{{$item.ctl}}">{{$item.value}}</text>
+          <text class="plus" if="{{$item.ctl}}" onclick="stepAt($idx, 1)">+</text>
+          <text class="sw" if="{{!$item.ctl}}" onclick="tapAt($idx)">{{$item.value}}</text>
+        </div>
+
+        <div class="preview">
+          <text class="p-title">{{pSize}}px · 每行 {{pCpl}} 字 · 每页 {{pLpp}} 行</text>
+          <text class="p-body" style="font-size: {{pSize}}px; line-height: {{pSize + 5}}px;">拆除对象：猎户支臂太阳系。拆除范围：以太阳为中心至柯伊伯带。</text>
+        </div>
+      </div>
+    </scroll>
+
+    <div class="donebtn" onclick="back">
+      <text class="done-t">完成</text>
+    </div>
+  </div>
+</template>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #141512; flex-direction: column; }
+.title { margin-left: 18px; margin-top: 10px; font-size: 24px; color: #eeeadd; }
+.sub { margin-left: 18px; margin-top: 3px; font-size: 12px; color: #a4a48e; }
+
+.sc { position: absolute; left: 0; top: 62px; width: 336px; height: 348px; }
+.inner { width: 336px; height: 470px; }
+
+.row { position: absolute; left: 14px; width: 308px; height: 54px; background-color: #24251f; }
+.lab { position: absolute; left: 12px; top: 15px; font-size: 18px; color: #e3e1cf; }
+.minus { position: absolute; left: 178px; top: 8px; width: 36px; text-align: center; font-size: 24px; color: #eb6877; }
+.val { position: absolute; left: 214px; top: 15px; width: 62px; text-align: center; font-size: 16px; color: #d1cbb6; }
+.plus { position: absolute; left: 276px; top: 8px; width: 28px; text-align: center; font-size: 24px; color: #eb6877; }
+.sw { position: absolute; left: 226px; top: 15px; width: 72px; text-align: right; font-size: 16px; color: #eb6877; }
+
+.preview { position: absolute; left: 14px; top: 340px; width: 308px; height: 120px; background-color: #191a17; border-width: 1px; border-style: solid; border-color: #292b23; }
+.p-title { position: absolute; left: 8px; top: 6px; font-size: 10px; color: #777663; }
+.p-body { position: absolute; left: 8px; top: 24px; width: 292px; color: #f0eee4; }
+
+.donebtn { position: absolute; left: 98px; top: 424px; width: 140px; height: 40px; background-color: #2c2e26; border-width: 1px; border-style: solid; border-color: #eb6877; border-radius: 12px; justify-content: center; align-items: center; }
+.done-t { font-size: 18px; color: #f7dfce; }
+</style>
+
+<script>
+import router from '@system.router'
+import brightness from '@system.brightness'
+import { loadSettings, saveSettings, SIZE_MIN, SIZE_MAX, SPEED_MIN, SPEED_MAX, AUTO_MIN, AUTO_MAX } from '../../common/reader.js'
+
+const TOPS = [0, 62, 124, 186, 248]
+
+export default {
+  protected: {
+    rows: [],
+    pSize: 18, pCpl: 17, pLpp: 5
+  },
+
+  onInit() {
+    this.lockTap = 0
+    this.settings = null
+    loadSettings((s) => { this.settings = s; this.sync() })
+  },
+
+  sync() {
+    const s = this.settings
+    this.rows = [
+      { key: 'size', label: '字号', value: String(s.size), ctl: true, top: TOPS[0] },
+      { key: 'speed', label: '播放速度', value: s.speed === 0 ? '瞬间' : s.speed + 'ms', ctl: true, top: TOPS[1] },
+      { key: 'autoMs', label: '自动播放', value: s.autoMs === 0 ? '关闭' : s.autoMs + 'ms', ctl: true, top: TOPS[2] },
+      { key: 'keepOn', label: '屏幕常亮', value: s.keepOn ? '开' : '关', ctl: false, top: TOPS[3] },
+      { key: 'about', label: '关于本作', value: '›', ctl: false, top: TOPS[4] }
+    ]
+    this.pSize = s.size
+    this.pCpl = Math.max(4, Math.floor((316 - 6) / s.size))
+    this.pLpp = Math.max(1, Math.min(5, Math.floor(116 / (s.size + 5))))
+  },
+
+  stepAt(i, dir) {
+    const row = this.rows[i]
+    if (row) this.step(row.key, dir === 0 ? -1 : 1)
+  },
+
+  tapAt(i) {
+    const row = this.rows[i]
+    if (row) this.tap(row.key)
+  },
+
+  step(key, dir) {
+    if (this.lockTap && Date.now() - this.lockTap < 300) return
+    this.lockTap = Date.now()
+    const s = this.settings
+    if (key === 'size') s.size = Math.max(SIZE_MIN, Math.min(SIZE_MAX, s.size + dir))
+    if (key === 'speed') s.speed = Math.max(SPEED_MIN, Math.min(SPEED_MAX, s.speed + dir * 2))
+    if (key === 'autoMs') s.autoMs = Math.max(AUTO_MIN, Math.min(AUTO_MAX, s.autoMs + dir * 10))
+    saveSettings(s)
+    this.sync()
+  },
+
+  tap(key) {
+    if (this.lockTap && Date.now() - this.lockTap < 300) return
+    this.lockTap = Date.now()
+    const s = this.settings
+    if (key === 'keepOn') {
+      s.keepOn = !s.keepOn
+      try { brightness.setKeepScreenOn({ keepScreenOn: s.keepOn }) } catch (e) {}
+    } else if (key === 'about') {
+      router.push({ uri: 'pages/about' })
+      return
+    }
+    saveSettings(s)
+    this.sync()
+  },
+
+  back() { router.back() }
+}
+</script>

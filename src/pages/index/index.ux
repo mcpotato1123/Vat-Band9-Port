@@ -1,0 +1,289 @@
+<template>
+  <div class="page">
+    <!-- full-bleed original main-menu artwork -->
+    <image class="bg" src="/common/title_bg.png" if="{{!warn}}"></image>
+    <text class="hud-r" if="{{!warn}}">{{ver}}</text>
+    <image class="logo" src="/common/logo.png" if="{{!warn}}"></image>
+
+    <div class="accent" if="{{!warn}}"></div>
+    <div class="menu" if="{{!warn}}">
+      <div class="row" for="{{rows}}" style="top: {{$item.top}}px;">
+        <image class="btn" src="{{$item.img}}" onclick="onPick($idx)"></image>
+      </div>
+    </div>
+
+    <!-- content warning, shown after 开始 (original: screen warning in splashscreen) -->
+    <div class="warn" if="{{warn}}">
+      <image class="w-top" src="/common/ui/warn_top.png"></image>
+      <text class="w-line" for="{{warnLines}}" style="top: {{$item.top}}px; color: {{$item.c}};">{{$item.t}}</text>
+      <image class="w-yes" src="/common/ui/accept.png" onclick="acceptWarn"></image>
+      <image class="w-no" src="/common/ui/decline.png" onclick="declineWarn"></image>
+    </div>
+
+    <!-- quit confirmation, same ○ / ✕ as the original -->
+    <div class="confirm" if="{{confirming}}">
+      <text class="c-msg">是否要退出游戏？</text>
+      <div class="c-row">
+        <image class="c-btn" src="/common/ui/confirm.png" onclick="doExit"></image>
+        <image class="c-btn" src="/common/ui/cancel.png" onclick="cancelExit"></image>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+.page {
+  position: relative;
+  width: 336px;
+  height: 480px;
+  background-color: #141512;
+}
+.bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 336px;
+  height: 480px;
+}
+.hud-r {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  font-size: 8px;
+  color: #e4cfc8;
+}
+.logo {
+  position: absolute;
+  left: 10px;
+  top: 26px;
+  width: 210px;
+  height: 118px;
+}
+.accent {
+  position: absolute;
+  left: 10px;
+  top: 202px;
+  width: 168px;
+  height: 2px;
+  background-color: #eb6877;
+}
+.menu {
+  position: absolute;
+  left: 10px;
+  top: 210px;
+  width: 168px;
+  height: 252px;
+  flex-direction: column;
+}
+.row {
+  position: absolute;
+  left: 0;
+  width: 168px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+}
+.btn {
+  width: 168px;
+  height: 36px;
+}
+
+/* ---------- content warning ---------- */
+.warn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 336px;
+  height: 480px;
+  background-color: #0b0507;
+}
+.w-top {
+  position: absolute;
+  left: 93px;
+  top: 8px;
+  width: 150px;
+  height: 153px;
+}
+.w-line {
+  position: absolute;
+  left: 10px;
+  width: 316px;
+  font-size: 11px;
+  line-height: 15px;
+  lines: 1;
+}
+.w-yes {
+  position: absolute;
+  left: 26px;
+  top: 402px;
+  width: 120px;
+  height: 33px;
+}
+.w-no {
+  position: absolute;
+  left: 190px;
+  top: 402px;
+  width: 120px;
+  height: 33px;
+}
+
+/* ---------- quit confirm ---------- */
+.confirm {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 336px;
+  height: 480px;
+  background-color: rgba(8, 6, 8, 0.84);
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+.c-msg {
+  margin-top: 132px;
+  width: 300px;
+  text-align: center;
+  font-size: 22px;
+  color: #f7dfce;
+}
+.c-row {
+  margin-top: 52px;
+  width: 260px;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+.c-btn {
+  width: 56px;
+  height: 56px;
+  margin-left: 34px;
+  margin-right: 34px;
+}
+</style>
+
+<script>
+import router from '@system.router'
+import prompt from '@system.prompt'
+import storage from '@system.storage'
+import file from '@system.file'
+
+const WARN_TEXT = [
+  '本作主要角色均已满18岁，平均年龄为100+岁.',
+  '女主反对“自残”、“药物滥用”等行为，因此女主并非传统意义上的“地雷女”.',
+  '本篇为单线单结局，所有选项均为演出效果服务，部分选项包含有整活性质的文本描述.',
+  '剧情中包含无厘头黑色幽默情节，以及低俗笑话，请衡量自身体质酌情游玩.',
+  '本作并非严肃文学.',
+  '',
+  '请确认您理解并认可以上说明.',
+  '如若您无法接受，我们深表遗憾，并希望您点击右侧按钮.'
+]
+
+const WARN_CPL = 27
+
+export default {
+  protected: {
+    ver: 'V 1.0.0',
+    confirming: false,
+    warn: false,
+    warnLines: [],
+    rows: [
+      { id: 'start', img: '/common/ui/start.png', top: 0 },
+      { id: 'load', img: '/common/ui/load.png', top: 42 },
+      { id: 'chapter', img: '/common/ui/chapter.png', top: 84 },
+      { id: 'cg', img: '/common/ui/extra.png', top: 126 },
+      { id: 'config', img: '/common/ui/config.png', top: 168 },
+      { id: 'exit', img: '/common/ui/exit.png', top: 210 }
+    ]
+  },
+
+  onInit() {
+    this.lockTap = 0
+    this.exiting = false
+    this.byeStart = -1
+    this.warnLines = this.buildWarn()
+    file.readText({
+      uri: '/common/story/index.txt',
+      success: (d) => {
+        try {
+          const idx = JSON.parse(d.text)
+          for (let i = 0; i < idx.chapters.length; i++) {
+            if (idx.chapters[i].id === 'byebye') this.byeStart = idx.chapters[i].start
+          }
+        } catch (e) {}
+      }
+    })
+  },
+
+  buildWarn() {
+    const out = []
+    let top = 172
+    for (let i = 0; i < WARN_TEXT.length; i++) {
+      const para = WARN_TEXT[i]
+      if (para === '') { top += 15; continue }
+      let line = ''
+      for (let c = 0; c < para.length; c++) {
+        line += para.charAt(c)
+        if (line.length >= WARN_CPL) {
+          out.push({ t: line, top: top, c: '#d8c9c4' })
+          top += 15
+          line = ''
+        }
+      }
+      if (line) { out.push({ t: line, top: top, c: '#d8c9c4' }); top += 15 }
+    }
+    return out
+  },
+
+  acceptWarn() {
+    this.warn = false
+    router.push({ uri: 'pages/game', params: { at: '0', fresh: '1' } })
+  },
+
+  declineWarn() {
+    this.warn = false
+    const at = this.byeStart >= 0 ? this.byeStart : 0
+    router.push({ uri: 'pages/game', params: { at: String(at), byebye: '1' } })
+  },
+
+  lock() { this.lockTap = Date.now() },
+
+  onPick(i) {
+    const id = this.rows[i] ? this.rows[i].id : ''
+    if (!id) return
+    if (this.lockTap && Date.now() - this.lockTap < 400) return
+    this.lock()
+    if (this.confirming) return
+    if (id === 'start') { this.warn = true; return }
+    if (id === 'load') return this.cont()
+    if (id === 'chapter') return router.push({ uri: 'pages/chapters' })
+    if (id === 'cg') return router.push({ uri: 'pages/cg' })
+    if (id === 'config') return router.push({ uri: 'pages/settings' })
+    if (id === 'exit') { this.confirming = true; return }
+  },
+
+  cancelExit() {
+    this.lock()
+    this.confirming = false
+  },
+
+  doExit() {
+    if (this.exiting) return
+    this.exiting = true
+    this.$app.exit()
+  },
+
+  cont() {
+    storage.get({
+      key: 'autoSave',
+      default: '',
+      success: (v) => {
+        if (!v) { prompt.showToast({ message: '还没有任何进度', duration: 1500 }); return }
+        let at = 0
+        try { at = JSON.parse(v).pc || 0 } catch (e) { at = 0 }
+        router.push({ uri: 'pages/game', params: { at: String(at) } })
+      },
+      fail: () => prompt.showToast({ message: '还没有任何进度', duration: 1500 })
+    })
+  }
+}
+</script>

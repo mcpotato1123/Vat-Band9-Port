@@ -1,0 +1,105 @@
+<template>
+  <div class="page">
+    <text class="title">章节</text>
+    <text class="sub">{{sub}}</text>
+
+    <div class="card" for="{{items}}" style="top: {{$item.top}}px;" onclick="onTap($idx)">
+      <div class="bar"></div>
+      <text class="cap">{{$item.title}}</text>
+      <text class="meta">{{$item.meta}}</text>
+      <text class="mark">›</text>
+    </div>
+
+    <div class="pager">
+      <text class="pg" onclick="prev">‹</text>
+      <text class="pnum">{{page + 1}} / {{pages}}</text>
+      <text class="pg" onclick="next">›</text>
+    </div>
+
+    <div class="backbtn" onclick="home">
+      <text class="back-t">返回标题</text>
+    </div>
+  </div>
+</template>
+
+<style>
+.page { width: 336px; height: 480px; background-color: #141512; flex-direction: column; }
+.title { margin-left: 18px; margin-top: 12px; font-size: 22px; color: #eeeadd; }
+.sub { margin-left: 18px; margin-top: 2px; font-size: 11px; color: #a4a48e; }
+
+.card { position: absolute; left: 14px; width: 308px; height: 84px; background-color: #282921; }
+.bar { position: absolute; left: 0; top: 0; width: 3px; height: 84px; background-color: #b58132; }
+.cap { position: absolute; left: 14px; top: 20px; width: 240px; font-size: 15px; color: #eeeadd; }
+.meta { position: absolute; left: 14px; top: 46px; width: 240px; font-size: 10px; color: #b8ac8b; }
+.mark { position: absolute; left: 276px; top: 30px; width: 24px; text-align: right; font-size: 14px; color: #eb6877; }
+
+.pager { position: absolute; left: 0; top: 384px; width: 336px; height: 26px; flex-direction: row; justify-content: center; align-items: center; }
+.pg { width: 56px; text-align: center; font-size: 20px; color: #d1cbb6; }
+.pnum { width: 90px; text-align: center; font-size: 12px; color: #b8ac8b; }
+.backbtn { position: absolute; left: 98px; top: 424px; width: 140px; height: 40px; background-color: #2c2e26; border-width: 1px; border-style: solid; border-color: #eb6877; border-radius: 12px; justify-content: center; align-items: center; }
+.back-t { font-size: 18px; color: #f7dfce; }
+</style>
+
+<script>
+import router from '@system.router'
+import file from '@system.file'
+
+const PER = 3
+const TOPS = [62, 154, 246]
+
+export default {
+  protected: {
+    items: [],
+    page: 0,
+    pages: 1,
+    sub: '读取中…'
+  },
+
+  onInit() {
+    this.lockTap = 0
+    this.all = []
+    this.visible = []
+    file.readText({
+      uri: '/common/story/index.txt',
+      success: (d) => {
+        let idx = null
+        try { idx = JSON.parse(d.text) } catch (e) { idx = null }
+        if (!idx || !idx.chapters) { this.sub = '索引读取失败'; return }
+        this.all = idx.chapters
+        this.visible = []
+        for (let i = 0; i < idx.chapters.length; i++) {
+          if (!idx.chapters[i].hide) this.visible.push(idx.chapters[i])
+        }
+        this.sub = '正篇 ' + this.visible.length + ' 章 · 轻触跳转'
+        this.pages = Math.max(1, Math.ceil(this.visible.length / PER))
+        this.refresh()
+      },
+      fail: (d, code) => { this.sub = '索引读取失败 ' + code }
+    })
+  },
+
+  refresh() {
+    const out = []
+    const base = this.page * PER
+    for (let i = 0; i < PER; i++) {
+      const c = this.visible[base + i]
+      if (!c) break
+      out.push({ title: c.title, meta: '节点 ' + c.start, top: TOPS[i] })
+    }
+    this.items = out
+  },
+
+  prev() { if (this.page > 0) { this.page--; this.refresh() } },
+  next() { if (this.page < this.pages - 1) { this.page++; this.refresh() } },
+
+  onTap(i) {
+    if (this.lockTap && Date.now() - this.lockTap < 400) return
+    this.lockTap = Date.now()
+    const c = this.visible[this.page * PER + i]
+    if (!c) return
+    router.replace({ uri: 'pages/game', params: { at: String(c.start) } })
+  },
+
+  home() { router.replace({ uri: 'pages/index' }) }
+}
+</script>
